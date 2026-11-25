@@ -90,6 +90,92 @@ pub fn to_win_disk(r: RawWinDisk) -> WinDisk {
     }
 }
 
+/// Free bytes on a drive letter such as "D".
+#[cfg(windows)]
+pub fn free_space(letter: &str) -> Option<u64> {
+    use windows_sys::Win32::Storage::FileSystem::GetDiskFreeSpaceExW;
+    let root: Vec<u16> = format!("{letter}:\\").encode_utf16().chain(std::iter::once(0)).collect();
+    let mut free_to_caller = 0u64;
+    let ok = unsafe { GetDiskFreeSpaceExW(root.as_ptr(), &mut free_to_caller, std::ptr::null_mut(), std::ptr::null_mut()) };
+    (ok != 0).then_some(free_to_caller)
+}
+
+#[cfg(not(windows))]
+pub fn free_space(_letter: &str) -> Option<u64> {
+    None
+}
+
+/// A storage problem Windows logged: a reset of the disk's connection (event 129 from a
+/// storage driver such as UASPStor) or a disk error (events 7, 11, 153 from "disk").
+#[derive(Debug, Clone, PartialEq)]
+pub struct StorageEvent {
+    pub source: String,
+    pub id: u32,
+    pub time: String,
+}
+
+/// Storage problems logged since `since_ms`. Used as the speed test's watchdog.
+pub async fn storage_events_since(since_ms: u64) -> Result<Vec<StorageEvent>, String> {
+    let query = format!(
+        "*[System[(EventID=129 or EventID=7 or EventID=11 or EventID=153) and TimeCreated[@SystemTime>='{}']]]",
+        iso_utc(since_ms)
+    );
+    let mut cmd = tokio::process::Command::new("wevtutil.exe");
+    cmd.args(["qe", "System", &format!("/q:{query}"), "/f:text", "/c:50"])
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .kill_on_drop(true);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    let child = cmd.spawn().map_err(|e| format!("Couldn’t read the Windows event log: {e}"))?;
+    let out = tokio::time::timeout(Duration::from_secs(15), child.wait_with_output())
+        .await
+        .map_err(|_| "Reading the Windows event log timed out.".to_string())?
+        .map_err(|e| e.to_string())?;
+    Ok(parse_storage_events(&String::from_utf8_lossy(&out.stdout)))
+}
+
+fn parse_storage_events(text: &str) -> Vec<StorageEvent> {
+    let mut events = Vec::new();
+    for block in text.split("Event[").skip(1) {
+        let field = |name: &str| {
+            block
+                .lines()
+                .find_map(|l| l.trim().strip_prefix(name).map(|v| v.trim().to_string()))
+                .unwrap_or_default()
+        };
+        let source = field("Source:");
+        let id: u32 = field("Event ID:").parse().unwrap_or(0);
+        let src = source.to_ascii_lowercase();
+        // Event 129 is also used by unrelated services (e.g. the time service), so only
+        // storage drivers count; 7/11/153 only from the "disk" driver.
+        let storage_reset = id == 129 && (src.contains("stor") || src.contains("nvme") || src.contains("disk"));
+        let disk_error = src == "disk" && matches!(id, 7 | 11 | 153);
+        if storage_reset || disk_error {
+            events.push(StorageEvent { source, id, time: field("Date:") });
+        }
+    }
+    events
+}
+
+/// Milliseconds since the Unix epoch -> "2026-11-25T07:35:00.000Z".
+pub fn iso_utc(ms: u64) -> String {
+    let secs = ms / 1000;
+    let (days, sod) = ((secs / 86_400) as i64, secs % 86_400);
+    // Civil-from-days (Howard Hinnant's algorithm).
+    let z = days + 719_468;
+    let era = z.div_euclid(146_097);
+    let doe = z.rem_euclid(146_097) as u64;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let d = doy - (153 * mp + 2) / 5 + 1;
+    let m = if mp < 10 { mp + 3 } else { mp - 9 };
+    let y = yoe as i64 + era * 400 + i64::from(m <= 2);
+    format!("{y:04}-{m:02}-{d:02}T{:02}:{:02}:{:02}.{:03}Z", sod / 3600, (sod % 3600) / 60, sod % 60, ms % 1000)
+}
+
 pub fn usb_info(raw: RawUsb) -> UsbInfo {
     let id = raw.instance_id.to_ascii_uppercase();
     let field = |key: &str| -> Option<String> {
@@ -154,6 +240,26 @@ fn chip_vendor(vid: &str) -> Option<&'static str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn formats_utc_times() {
+        assert_eq!(iso_utc(1_795_592_100_000), "2026-11-25T07:35:00.000Z");
+        assert_eq!(iso_utc(0), "1970-01-01T00:00:00.000Z");
+        assert_eq!(iso_utc(951_782_400_123), "2000-02-29T00:00:00.123Z");
+    }
+
+    #[test]
+    fn picks_out_storage_events_only() {
+        let text = "Event[0]:\r\n  Log Name: System\r\n  Source: UASPStor\r\n  Date: 2026-11-25T10:41:11.000\r\n  Event ID: 129\r\n  Description: Reset to device, \\Device\\RaidPort4, was issued.\r\n\r\n\
+Event[1]:\r\n  Log Name: System\r\n  Source: Microsoft-Windows-Time-Service\r\n  Date: 2026-11-25T10:42:00.000\r\n  Event ID: 129\r\n\r\n\
+Event[2]:\r\n  Log Name: System\r\n  Source: disk\r\n  Date: 2026-11-25T10:43:00.000\r\n  Event ID: 153\r\n";
+        let events = parse_storage_events(text);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].source, "UASPStor");
+        assert_eq!(events[0].id, 129);
+        assert_eq!(events[1].source, "disk");
+        assert_eq!(events[1].id, 153);
+    }
 
     #[test]
     fn detects_usb2_and_usb3_ports() {

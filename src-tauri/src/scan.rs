@@ -2,10 +2,12 @@
 
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::history::{Snapshot, Store};
 use crate::model::*;
 use crate::{elevation, health, smartctl, windows_info};
 
-pub async fn scan_all(resource_dir: Option<std::path::PathBuf>) -> ScanResult {
+/// `store` (the drive history) is optional so diagnostics can scan without saving anything.
+pub async fn scan_all(resource_dir: Option<std::path::PathBuf>, store: Option<&Store>) -> ScanResult {
     let elevated = elevation::is_elevated();
     let mut warnings = Vec::new();
 
@@ -50,19 +52,38 @@ pub async fn scan_all(resource_dir: Option<std::path::PathBuf>) -> ScanResult {
             ),
             (None, _) => (None, Some("smartctl is missing, so this drive’s health can’t be read.".into())),
         };
-        drives.push(build_report(win, smart, smart_error));
+        let previous = match (store, smart.as_ref().and_then(|s| s.serial.as_deref())) {
+            (Some(st), Some(serial)) => st.last_snapshot(serial),
+            _ => None,
+        };
+        let report = build_report(win, smart, smart_error, previous.as_ref());
+        if let (Some(st), Some(s), Some(h)) = (store, report.smart.as_ref(), report.health.as_ref()) {
+            if s.serial.is_some() {
+                if let Err(e) = st.record(&report.key, &Snapshot::of(s, h, report.checked_at_ms)).and_then(|_| st.save_report(&report)) {
+                    warnings.push(format!("Couldn’t save drive history: {e}"));
+                }
+            }
+        }
+        drives.push(report);
     }
 
-    ScanResult { scanned_at_ms: now_ms(), elevated, smartctl_version, drives, warnings }
+    let offline = match store {
+        Some(st) => {
+            let keys: Vec<&str> = drives.iter().map(|d| d.key.as_str()).collect();
+            st.offline_reports(&keys)
+        }
+        None => Vec::new(),
+    };
+    ScanResult { scanned_at_ms: now_ms(), elevated, smartctl_version, drives, offline, warnings }
 }
 
 pub fn now_ms() -> u64 {
     SystemTime::now().duration_since(UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0)
 }
 
-pub fn build_report(win: WinDisk, smart: Option<SmartInfo>, smart_error: Option<String>) -> DriveReport {
+pub fn build_report(win: WinDisk, smart: Option<SmartInfo>, smart_error: Option<String>, previous: Option<&Snapshot>) -> DriveReport {
     let kind = drive_kind(&win, smart.as_ref());
-    let health = smart.as_ref().map(|s| health::assess(s, kind, win.usb.as_ref()));
+    let health = smart.as_ref().map(|s| health::assess(s, kind, win.usb.as_ref(), previous));
     let capacity = smart.as_ref().and_then(|s| s.capacity_bytes).or(win.size_bytes).unwrap_or(0);
     let key = smart
         .as_ref()
@@ -71,6 +92,8 @@ pub fn build_report(win: WinDisk, smart: Option<SmartInfo>, smart_error: Option<
     DriveReport {
         disk_number: win.number,
         key,
+        checked_at_ms: now_ms(),
+        connected: true,
         title: title(&win, smart.as_ref(), capacity),
         capacity_label: capacity_label(capacity),
         kind,
@@ -149,7 +172,7 @@ mod tests {
         let v = load(smart_file);
         let smart = smartctl::parse(&v, "/dev/sdb", "sat");
         let raw: RawWinDisk = serde_json::from_value(win.clone()).unwrap();
-        build_report(windows_info::to_win_disk(raw), Some(smart), None)
+        build_report(windows_info::to_win_disk(raw), Some(smart), None, None)
     }
 
     fn preview_windows() -> Vec<Value> {
@@ -206,7 +229,7 @@ mod tests {
     fn real(file: &str, dtype: &str, win: &Value) -> DriveReport {
         let smart = smartctl::parse(&load(file), "/dev/sdx", dtype);
         let raw: RawWinDisk = serde_json::from_value(win.clone()).unwrap();
-        build_report(windows_info::to_win_disk(raw), Some(smart), None)
+        build_report(windows_info::to_win_disk(raw), Some(smart), None, None)
     }
 
     /// Real smartctl 7.5 output from a KIOXIA NVMe SSD (serial replaced).
@@ -244,6 +267,56 @@ mod tests {
         assert_eq!(hist.values.len(), 128);
     }
 
+    /// The weak-sector drive, compared with a previous check where it was clean.
+    #[test]
+    fn flags_counters_that_got_worse_since_last_check() {
+        let v = load("wd_WXD2A5156PC4.json");
+        let smart = smartctl::parse(&v, "/dev/sdb", "sat");
+        let raw: RawWinDisk = serde_json::from_value(preview_windows()[2].clone()).unwrap();
+        let before = Snapshot {
+            at_ms: 1,
+            score: 100,
+            status: HealthStatus::Excellent,
+            reallocated: 0,
+            pending: 0,
+            uncorrectable: 0,
+            error_log: 0,
+            media_errors: 0,
+            percentage_used: None,
+            temperature: Some(30),
+            power_on_hours: Some(11),
+        };
+        let r = build_report(windows_info::to_win_disk(raw), Some(smart), None, Some(&before));
+        let h = r.health.unwrap();
+        let worse = h.findings.iter().find(|f| f.title == "Worse since the last check").expect("change finding");
+        assert!(worse.detail.starts_with("Pending sectors 0 → 1; Errors logged 0 → 2."), "{}", worse.detail);
+        assert_eq!(h.summary, "1 sector can’t be read reliably, plus 1 more issue.");
+    }
+
+    #[test]
+    fn notes_a_cleared_weak_sector() {
+        let v = load("wd_WXG2A511Z64P.json");
+        let smart = smartctl::parse(&v, "/dev/sdb", "sat");
+        let raw: RawWinDisk = serde_json::from_value(preview_windows()[1].clone()).unwrap();
+        let before = Snapshot {
+            at_ms: 1,
+            score: 98,
+            status: HealthStatus::Caution,
+            reallocated: 0,
+            pending: 1,
+            uncorrectable: 0,
+            error_log: 0,
+            media_errors: 0,
+            percentage_used: None,
+            temperature: Some(30),
+            power_on_hours: Some(8),
+        };
+        let r = build_report(windows_info::to_win_disk(raw), Some(smart), None, Some(&before));
+        let h = r.health.unwrap();
+        assert!(h.findings.iter().any(|f| f.title == "The weak sector was cleared"));
+        assert!(!h.findings.iter().any(|f| f.title == "Worse since the last check"));
+    }
+
     /// `UPDATE_MOCK=1 cargo test write_preview_data` regenerates the browser preview data
     /// (src/mock/scan.json) from the fixtures, so the preview always matches the real engine.
     #[test]
@@ -251,20 +324,27 @@ mod tests {
         if std::env::var("UPDATE_MOCK").is_err() {
             return;
         }
+        const SCANNED: u64 = 1_795_592_100_000; // 25 Nov 2026 13:05 IST
         let w = preview_windows();
-        let drives = vec![
+        let mut drives = vec![
             real("real_kioxia_nvme.json", "nvme", &w[0]),
             report("wd_WXG2A511Z64P.json", &w[1]),
             report("wd_WXD2A5156PC4.json", &w[2]),
-            report("wd_WXE2A41CJUV4.json", &w[3]),
             real("real_seagate_st1000lm035.json", "sat", &w[4]),
         ];
+        for d in &mut drives {
+            d.checked_at_ms = SCANNED;
+        }
+        // The USB 2.0 drive appears as "previously checked", as it was at 10:16.
+        let mut offline = report("wd_WXE2A41CJUV4.json", &w[3]);
+        offline.connected = false;
+        offline.checked_at_ms = 1_795_581_960_000;
         let result = ScanResult {
-            scanned_at_ms: 1_795_592_100_000, // 25 Nov 2026 13:05 IST
-
+            scanned_at_ms: SCANNED,
             elevated: true,
             smartctl_version: Some("7.5".into()),
             drives,
+            offline: vec![offline],
             warnings: vec![],
         };
         let out = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..").join("src").join("mock").join("scan.json");

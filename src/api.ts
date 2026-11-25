@@ -1,23 +1,52 @@
-import type { ScanResult } from "./types";
+import type { DriveHistory, ScanResult, SelfTestStatus, SpeedProgress, SpeedRequest, SpeedRun } from "./types";
+import * as preview from "./mock/preview";
 
 /** True inside the desktop app; false when the UI is opened in a browser for preview. */
 export const isDesktop = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  const core = await import("@tauri-apps/api/core");
+  return core.invoke<T>(cmd, args);
+}
+
 export async function scanDrives(): Promise<ScanResult> {
-  if (isDesktop) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    return invoke<ScanResult>("scan_drives");
+  return isDesktop ? invoke<ScanResult>("scan_drives") : preview.scanDrives();
+}
+
+export async function getHistory(key: string): Promise<DriveHistory> {
+  return isDesktop ? invoke<DriveHistory>("get_history", { key }) : preview.getHistory(key);
+}
+
+export async function startSelfTest(key: string, deviceName: string, deviceType: string, kind: "short" | "long"): Promise<void> {
+  return isDesktop ? invoke("start_self_test", { key, deviceName, deviceType, kind }) : preview.startSelfTest(key, kind);
+}
+
+export async function selfTestStatus(deviceName: string, deviceType: string): Promise<SelfTestStatus> {
+  return isDesktop ? invoke<SelfTestStatus>("self_test_status", { deviceName, deviceType }) : preview.selfTestStatus();
+}
+
+export async function abortSelfTest(key: string, deviceName: string, deviceType: string): Promise<void> {
+  return isDesktop ? invoke("abort_self_test", { key, deviceName, deviceType }) : preview.abortSelfTest();
+}
+
+/** Runs the speed test; `onProgress` receives each step as it happens. */
+export async function startSpeedTest(request: SpeedRequest, onProgress: (p: SpeedProgress) => void): Promise<SpeedRun> {
+  if (!isDesktop) return preview.startSpeedTest(request, onProgress);
+  const { listen } = await import("@tauri-apps/api/event");
+  const unlisten = await listen<SpeedProgress>("speed-progress", (e) => onProgress(e.payload));
+  try {
+    return await invoke<SpeedRun>("start_speed_test", { request });
+  } finally {
+    unlisten();
   }
-  // Browser preview: readings from 25 Nov 2026, generated from the engine's test fixtures.
-  const mock = await import("./mock/scan.json");
-  await new Promise((r) => setTimeout(r, 350));
-  return mock.default as unknown as ScanResult;
+}
+
+export async function cancelSpeedTest(): Promise<void> {
+  return isDesktop ? invoke("cancel_speed_test") : preview.cancelSpeedTest();
 }
 
 export async function restartAsAdmin(): Promise<void> {
-  if (!isDesktop) return;
-  const { invoke } = await import("@tauri-apps/api/core");
-  await invoke("restart_as_admin");
+  if (isDesktop) await invoke("restart_as_admin");
 }
 
 export async function openLink(url: string): Promise<void> {

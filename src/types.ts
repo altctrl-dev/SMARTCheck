@@ -10,12 +10,17 @@ export interface ScanResult {
   elevated: boolean;
   smartctlVersion: string | null;
   drives: DriveReport[];
+  /** Drives checked before that aren't connected now (their last saved report). */
+  offline: DriveReport[];
   warnings: string[];
 }
 
 export interface DriveReport {
   diskNumber: number;
   key: string;
+  checkedAtMs: number;
+  /** False for a saved report of a drive that isn't connected now. */
+  connected: boolean;
   title: string;
   capacityLabel: string;
   kind: DriveKind;
@@ -161,4 +166,66 @@ export interface Health {
   findings: Finding[];
   indicators: Indicator[];
   deductions: Deduction[];
+}
+
+// ---------------------------------------------------------------- History, self-tests, speed
+
+export interface Snapshot {
+  atMs: number;
+  score: number;
+  status: HealthStatus;
+  reallocated: number;
+  pending: number;
+  uncorrectable: number;
+  errorLog: number;
+  mediaErrors: number;
+  percentageUsed: number | null;
+  temperature: number | null;
+  powerOnHours: number | null;
+}
+
+export interface Measurement {
+  id: string;
+  label: string;
+  write: boolean;
+  mbPerS: number;
+  iops: number;
+  avgLatencyMs: number;
+}
+
+export interface SpeedRun {
+  atMs: number;
+  volume: string;
+  link: UsbLink | null;
+  results: Measurement[];
+  stopped: string | null;
+}
+
+export interface DriveHistory {
+  snapshots: Snapshot[];
+  speedRuns: SpeedRun[];
+}
+
+export interface SelfTestStatus {
+  running: boolean;
+  remainingPercent: number | null;
+  status: string;
+}
+
+export type StepState = "pending" | "running" | "done" | "failed" | "skipped";
+
+export interface SpeedProgress {
+  step: string;
+  state: Exclude<StepState, "pending">;
+  message: string;
+  percent: number | null;
+  measurement: Measurement | null;
+}
+
+export interface SpeedRequest {
+  key: string;
+  deviceName: string;
+  deviceType: string;
+  volume: string;
+  usbLink: UsbLink | null;
 }

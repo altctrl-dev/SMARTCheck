@@ -24,7 +24,7 @@ export default function App() {
       const result = await scanDrives();
       setScan(result);
       setSelectedKey((prev) => {
-        if (prev && result.drives.some((d) => d.key === prev)) return prev;
+        if (prev && [...result.drives, ...result.offline].some((d) => d.key === prev)) return prev;
         const first = result.drives.find(isExternal) ?? result.drives[0];
         return first?.key ?? null;
       });
@@ -39,7 +39,7 @@ export default function App() {
     runScan();
   }, [runScan]);
 
-  const drive = scan?.drives.find((d) => d.key === selectedKey) ?? null;
+  const drive = [...(scan?.drives ?? []), ...(scan?.offline ?? [])].find((d) => d.key === selectedKey) ?? null;
   const closeDetails = useCallback(() => setDetails(null), []);
 
   return (

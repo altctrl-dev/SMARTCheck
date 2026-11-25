@@ -1,8 +1,12 @@
+import { useEffect, useState } from "react";
+import { isDesktop } from "../api";
 import type { DriveReport, Health, Level, ScanResult, SmartInfo } from "../types";
-import { STATUS, fmtBytes, fmtHours, fmtNum, fmtTime, tempLevel } from "../format";
+import { STATUS, fmtBytes, fmtDateTime, fmtHours, fmtNum, fmtTime, tempLevel } from "../format";
 import { DetailsIcon, RefreshIcon, StatusIcon } from "./Icons";
 import { TempChart } from "./TempChart";
 import type { DetailsTab } from "./DetailsPanel";
+import { SelfTestMenu, SelfTestStrip, useSelfTest } from "./SelfTest";
+import { SpeedTestPanel, speedTestBlocker } from "./SpeedTestPanel";
 
 interface Props {
   drive: DriveReport;
@@ -15,6 +19,17 @@ interface Props {
 export function DriveView({ drive, scan, scanning, onRescan, onDetails }: Props) {
   const s = drive.smart;
   const h = drive.health;
+  const selfTest = useSelfTest(drive, onRescan);
+  // Browser preview only: ?speed=open|run and ?selftest=short|long open those states for screenshots.
+  const preview = isDesktop ? null : new URLSearchParams(window.location.search);
+  const [speedOpen, setSpeedOpen] = useState(preview?.get("speed") != null);
+  const previewSelfTest = preview?.get("selftest");
+  useEffect(() => {
+    if (previewSelfTest === "short" || previewSelfTest === "long") selfTest.start(previewSelfTest);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [previewSelfTest]);
+  const canAct = drive.connected && scan.elevated && !!s;
+  const speedBlocker = speedTestBlocker(drive, selfTest.running);
   const vols = drive.windows.volumes
     .map((v) => (v.label ? `${v.letter}: “${v.label}”` : `${v.letter}:`))
     .join(", ");
@@ -24,7 +39,7 @@ export function DriveView({ drive, scan, scanning, onRescan, onDetails }: Props)
     s?.serial ? `SN ${s.serial}` : null,
     drive.capacityLabel,
     vols || null,
-    `checked ${fmtTime(scan.scannedAtMs)}`,
+    drive.connected ? `checked ${fmtTime(drive.checkedAtMs || scan.scannedAtMs)}` : null,
   ]
     .filter(Boolean)
     .join(" · ");
@@ -37,16 +52,48 @@ export function DriveView({ drive, scan, scanning, onRescan, onDetails }: Props)
           <div className="meta">{meta}</div>
         </div>
         <div className="actions">
-          <button className="btn ghost" onClick={onRescan} disabled={scanning}>
-            <RefreshIcon className={scanning ? "spin" : undefined} />
-            {scanning ? "Checking…" : "Re-check"}
-          </button>
+          {drive.connected && (
+            <button className="btn ghost" onClick={onRescan} disabled={scanning}>
+              <RefreshIcon className={scanning ? "spin" : undefined} />
+              {scanning ? "Checking…" : "Re-check"}
+            </button>
+          )}
+          {drive.connected && <SelfTestMenu drive={drive} st={selfTest} disabled={!canAct} />}
+          {drive.connected && (
+            <button
+              className="btn"
+              onClick={() => setSpeedOpen(true)}
+              disabled={!canAct || selfTest.running}
+              title={speedBlocker ?? "Measure read and write speed"}
+            >
+              Speed test
+            </button>
+          )}
           <button className="btn" onClick={() => onDetails("findings")} disabled={!s}>
             <DetailsIcon />
             Details
           </button>
         </div>
       </header>
+
+      {!drive.connected && (
+        <div className="banner info">
+          <StatusIcon level="info" />
+          <span>
+            <b>Not connected.</b> This is the report from {fmtDateTime(drive.checkedAtMs)}. Plug the drive in and choose Rescan drives to check it again.
+          </span>
+        </div>
+      )}
+      <SelfTestStrip drive={drive} st={selfTest} />
+      {speedOpen && (
+        <SpeedTestPanel
+          drive={drive}
+          selfTestRunning={selfTest.running}
+          autoStart={preview?.get("speed") === "run"}
+          onClose={() => setSpeedOpen(false)}
+          onFinished={() => undefined}
+        />
+      )}
 
       {s && h ? (
         <>
@@ -82,7 +129,7 @@ export function DriveView({ drive, scan, scanning, onRescan, onDetails }: Props)
                     {s.tempHistory.intervalMinutes > 1 ? ` · every ${s.tempHistory.intervalMinutes} min` : ""} · °C
                   </span>
                 </div>
-                <TempChart history={s.tempHistory} endMs={scan.scannedAtMs} />
+                <TempChart history={s.tempHistory} endMs={drive.checkedAtMs || scan.scannedAtMs} />
               </section>
             ) : (
               <UsageCard s={s} />

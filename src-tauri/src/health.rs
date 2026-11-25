@@ -4,12 +4,32 @@
 //! Status: like CrystalDiskInfo, any bad/pending/unreadable sector, logged error or failed
 //! self-test makes it "Caution" whatever the percentage.
 
+use crate::history::Snapshot;
 use crate::model::*;
 
-pub fn assess(s: &SmartInfo, kind: DriveKind, usb: Option<&UsbInfo>) -> Health {
+/// `previous` is the drive's last saved check, used to spot anything that got worse.
+pub fn assess(s: &SmartInfo, kind: DriveKind, usb: Option<&UsbInfo>, previous: Option<&Snapshot>) -> Health {
     match kind {
-        DriveKind::Nvme => assess_nvme(s, usb),
-        _ => assess_ata(s, kind, usb),
+        DriveKind::Nvme => assess_nvme(s, usb, previous),
+        _ => assess_ata(s, kind, usb, previous),
+    }
+}
+
+/// Counters that only ever go up on a failing drive.
+fn change_findings(f: &mut Vec<Finding>, previous: Option<&Snapshot>, now: &[(&str, u64, fn(&Snapshot) -> u64)]) {
+    let Some(prev) = previous else { return };
+    let worse: Vec<String> = now
+        .iter()
+        .filter(|(_, value, before)| *value > before(prev))
+        .map(|(label, value, before)| format!("{label} {} → {}", fmt_num(before(prev)), fmt_num(*value)))
+        .collect();
+    if !worse.is_empty() {
+        f.push(finding(
+            Level::Warning,
+            "Worse since the last check",
+            format!("{}. A count that keeps growing means the drive is developing problems.", worse.join("; ")),
+            Some("Back up anything important now, and check the drive again in a few days."),
+        ));
     }
 }
 
@@ -178,7 +198,7 @@ fn finish(mut f: Vec<Finding>, good_detail: String) -> (Vec<Finding>, String) {
     let summary = match warnings.len() {
         0 => "No signs of wear or failure.".to_string(),
         1 => format!("{}. Everything else looks normal.", warnings[0].title),
-        n => format!("{}, plus {} more.", warnings[0].title, plural(n as u64 - 1, "issue")),
+        n => format!("{}, plus {}.", warnings[0].title, plural(n as u64 - 1, "more issue")),
     };
     if warnings.is_empty() {
         f.insert(0, finding(Level::Good, "No signs of wear or failure", good_detail, None));
@@ -188,7 +208,7 @@ fn finish(mut f: Vec<Finding>, good_detail: String) -> (Vec<Finding>, String) {
 
 // ---------------------------------------------------------------- SATA / ATA
 
-fn assess_ata(s: &SmartInfo, kind: DriveKind, usb: Option<&UsbInfo>) -> Health {
+fn assess_ata(s: &SmartInfo, kind: DriveKind, usb: Option<&UsbInfo>, previous: Option<&Snapshot>) -> Health {
     let attr = |id: u64| s.attributes.iter().find(|a| a.id == id);
     let raw = |id: u64| attr(id).map(|a| a.raw).unwrap_or(0);
     let is_hdd = kind == DriveKind::Hdd;
@@ -301,6 +321,26 @@ fn assess_ata(s: &SmartInfo, kind: DriveKind, usb: Option<&UsbInfo>) -> Health {
             Some("Keep a backup of anything important, then run the extended self-test."),
         ));
     }
+    change_findings(
+        &mut f,
+        previous,
+        &[
+            ("Reallocated sectors", realloc, |p| p.reallocated),
+            ("Pending sectors", pending, |p| p.pending),
+            ("Uncorrectable sectors", offline, |p| p.uncorrectable),
+            ("Errors logged", s.error_log_count, |p| p.error_log),
+        ],
+    );
+    if let Some(prev) = previous {
+        if prev.pending > 0 && pending == 0 && realloc == prev.reallocated {
+            f.push(finding(
+                Level::Info,
+                "The weak sector was cleared",
+                "The drive re-tested the sector it couldn’t read before and kept it, so it was a weak write rather than damage.",
+                None,
+            ));
+        }
+    }
     if s.error_log_count > 0 && pending == 0 {
         let last = s.error_log.first();
         let when = last.and_then(|e| e.lifetime_hours).map(|h| format!(" The latest was at drive hour {}.", fmt_num(h))).unwrap_or_default();
@@ -392,7 +432,7 @@ fn assess_ata(s: &SmartInfo, kind: DriveKind, usb: Option<&UsbInfo>) -> Health {
 
 // ---------------------------------------------------------------- NVMe
 
-fn assess_nvme(s: &SmartInfo, usb: Option<&UsbInfo>) -> Health {
+fn assess_nvme(s: &SmartInfo, usb: Option<&UsbInfo>, previous: Option<&Snapshot>) -> Health {
     let n = s.nvme.clone().unwrap_or_default();
     let used = n.percentage_used.unwrap_or(0);
     let spare_low = matches!((n.available_spare, n.available_spare_threshold), (Some(a), Some(t)) if a < t);
@@ -434,6 +474,7 @@ fn assess_nvme(s: &SmartInfo, usb: Option<&UsbInfo>) -> Health {
     if cw & 0x10 != 0 {
         f.push(finding(Level::Warning, "Backup power problem", "The drive reports that its power-loss protection failed.", None));
     }
+    change_findings(&mut f, previous, &[("Media errors", n.media_errors, |p| p.media_errors)]);
     if n.media_errors > 0 {
         f.push(finding(
             if n.media_errors >= 10 { Level::Critical } else { Level::Warning },

@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ScanResult {
     /// Milliseconds since the Unix epoch when the scan finished.
@@ -10,15 +10,24 @@ pub struct ScanResult {
     pub elevated: bool,
     pub smartctl_version: Option<String>,
     pub drives: Vec<DriveReport>,
+    /// Drives checked before that aren't connected now: their last saved report.
+    #[serde(default)]
+    pub offline: Vec<DriveReport>,
     pub warnings: Vec<String>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct DriveReport {
     pub disk_number: u32,
     /// Stable identity: the drive's serial number when known.
     pub key: String,
+    /// When this report was made (ms since the Unix epoch).
+    #[serde(default)]
+    pub checked_at_ms: u64,
+    /// False for a saved report of a drive that isn't connected now.
+    #[serde(default = "yes")]
+    pub connected: bool,
     pub title: String,
     pub capacity_label: String,
     pub kind: DriveKind,
@@ -28,7 +37,11 @@ pub struct DriveReport {
     pub health: Option<Health>,
 }
 
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+fn yes() -> bool {
+    true
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum DriveKind {
     Hdd,
@@ -74,7 +87,7 @@ pub struct Volume {
     pub free_bytes: Option<u64>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct WinDisk {
     pub number: u32,
@@ -88,7 +101,7 @@ pub struct WinDisk {
     pub usb: Option<UsbInfo>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct UsbInfo {
     pub vendor_id: Option<String>,
@@ -102,7 +115,7 @@ pub struct UsbInfo {
     pub driver: Option<String>,
 }
 
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum UsbLink {
     Usb3,
@@ -112,7 +125,7 @@ pub enum UsbLink {
 
 // ---------------------------------------------------------------- S.M.A.R.T. side
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct SmartInfo {
     pub protocol: String,
@@ -153,7 +166,7 @@ pub struct SmartInfo {
     pub messages: Vec<String>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TempHistory {
     pub interval_minutes: u64,
@@ -161,7 +174,7 @@ pub struct TempHistory {
     pub values: Vec<Option<i64>>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct AtaAttribute {
     pub id: u64,
@@ -175,7 +188,7 @@ pub struct AtaAttribute {
     pub when_failed: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct ErrorEntry {
     pub number: u64,
@@ -184,7 +197,7 @@ pub struct ErrorEntry {
     pub description: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct SelfTest {
     pub kind: String,
@@ -194,7 +207,7 @@ pub struct SelfTest {
     pub lba_first_error: Option<u64>,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct NvmeHealth {
     pub critical_warning: u64,
@@ -208,7 +221,7 @@ pub struct NvmeHealth {
 
 // ---------------------------------------------------------------- Assessment
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Health {
     pub score: u8,
@@ -220,7 +233,7 @@ pub struct Health {
     pub deductions: Vec<Deduction>,
 }
 
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum HealthStatus {
     Excellent,
@@ -231,7 +244,7 @@ pub enum HealthStatus {
     Failing,
 }
 
-#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[serde(rename_all = "lowercase")]
 pub enum Level {
     Good,
@@ -240,7 +253,7 @@ pub enum Level {
     Critical,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Finding {
     pub level: Level,
@@ -249,7 +262,7 @@ pub struct Finding {
     pub action: Option<String>,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Indicator {
     pub label: String,
@@ -258,7 +271,7 @@ pub struct Indicator {
     pub help: String,
 }
 
-#[derive(Serialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Deduction {
     pub factor: String,

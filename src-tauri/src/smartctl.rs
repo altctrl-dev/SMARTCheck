@@ -114,6 +114,100 @@ pub async fn read_device(path: &Path, dev: &ScanDevice) -> Result<SmartInfo, Str
     Ok(info)
 }
 
+// ---------------------------------------------------------------- Identity and self-tests
+
+/// Refuses to continue unless the device still reports the expected serial number, so a
+/// replugged or swapped drive that took over the same device name is never acted on by mistake.
+pub async fn verify_identity(path: &Path, name: &str, dtype: &str, serial: &str) -> Result<(), String> {
+    let out = run(path, &["-i", "--json", "-d", dtype, name], 30).await?;
+    let v: Value = serde_json::from_slice(&out).map_err(|e| format!("Unexpected smartctl output: {e}"))?;
+    match s(&v, "/serial_number") {
+        Some(found) if found == serial => Ok(()),
+        Some(found) => Err(format!(
+            "Safety check: {name} is now a different drive (serial {found}, expected {serial}). Rescan drives and try again."
+        )),
+        None => Err(format!("Safety check: couldn’t confirm the drive’s serial number ({serial}). Rescan drives and try again.")),
+    }
+}
+
+fn command_error(v: &Value) -> Option<String> {
+    // Bits 0–1 of smartctl's exit status: command line or device open problems.
+    let status = u(v, "/smartctl/exit_status").unwrap_or(0);
+    if status & 0b11 == 0 {
+        return None;
+    }
+    let msgs: Vec<String> = v
+        .pointer("/smartctl/messages")
+        .and_then(Value::as_array)
+        .map(|arr| arr.iter().filter_map(|m| s(m, "/string")).collect())
+        .unwrap_or_default();
+    Some(if msgs.is_empty() { "smartctl couldn’t reach the drive.".into() } else { msgs.join(" ") })
+}
+
+/// `kind` is "short" or "long". The test runs inside the drive; this returns once it has started.
+pub async fn start_self_test(path: &Path, name: &str, dtype: &str, kind: &str) -> Result<(), String> {
+    if kind != "short" && kind != "long" {
+        return Err("Unknown self-test type.".into());
+    }
+    let out = run(path, &["-t", kind, "--json", "-d", dtype, name], 30).await?;
+    let v: Value = serde_json::from_slice(&out).map_err(|e| format!("Unexpected smartctl output: {e}"))?;
+    match command_error(&v) {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+pub async fn abort_self_test(path: &Path, name: &str, dtype: &str) -> Result<(), String> {
+    let out = run(path, &["-X", "--json", "-d", dtype, name], 30).await?;
+    let v: Value = serde_json::from_slice(&out).map_err(|e| format!("Unexpected smartctl output: {e}"))?;
+    match command_error(&v) {
+        Some(e) => Err(e),
+        None => Ok(()),
+    }
+}
+
+#[derive(serde::Serialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct SelfTestStatus {
+    pub running: bool,
+    pub remaining_percent: Option<u64>,
+    pub status: String,
+}
+
+pub async fn self_test_status(path: &Path, name: &str, dtype: &str) -> Result<SelfTestStatus, String> {
+    let args: &[&str] = if dtype == "nvme" { &["-l", "selftest", "--json", "-d", dtype, name] } else { &["-c", "--json", "-d", dtype, name] };
+    let out = run(path, args, 30).await?;
+    let v: Value = serde_json::from_slice(&out).map_err(|e| format!("Unexpected smartctl output: {e}"))?;
+    if let Some(e) = command_error(&v) {
+        return Err(e);
+    }
+    Ok(parse_self_test_status(&v))
+}
+
+fn parse_self_test_status(v: &Value) -> SelfTestStatus {
+    if let Some(op) = v.pointer("/nvme_self_test_log/current_self_test_operation") {
+        let running = u(op, "/value").unwrap_or(0) != 0;
+        let done = u(v, "/nvme_self_test_log/current_self_test_completion_percent");
+        return SelfTestStatus {
+            running,
+            remaining_percent: if running { done.map(|d| 100u64.saturating_sub(d)) } else { None },
+            status: s(op, "/string").unwrap_or_default(),
+        };
+    }
+    // ATA: the high nibble 0xF of the self-test status byte means "in progress".
+    let value = u(v, "/ata_smart_data/self_test/status/value").unwrap_or(0);
+    let running = value >> 4 == 0xF;
+    SelfTestStatus {
+        running,
+        remaining_percent: if running {
+            u(v, "/ata_smart_data/self_test/status/remaining_percent").or(Some((value & 0x0F) * 10))
+        } else {
+            None
+        },
+        status: s(v, "/ata_smart_data/self_test/status/string").unwrap_or_default(),
+    }
+}
+
 // ---------------------------------------------------------------- JSON parsing
 
 fn s(v: &Value, p: &str) -> Option<String> {
@@ -314,7 +408,7 @@ pub fn parse(v: &Value, device_name: &str, device_type: &str) -> SmartInfo {
         error_log_count,
         error_log,
         self_tests,
-        self_test_remaining: u(v, "/ata_smart_data/self_test/status/remaining_percent"),
+        self_test_remaining: parse_self_test_status(v).remaining_percent,
         self_test_minutes_short: u(v, "/ata_smart_data/self_test/polling_minutes/short"),
         self_test_minutes_extended: u(v, "/ata_smart_data/self_test/polling_minutes/extended"),
         nvme,
@@ -336,6 +430,20 @@ mod tests {
         assert_eq!(device_index("/dev/sdaa"), Some(26));
         assert_eq!(device_index("/dev/pd3"), Some(3));
         assert_eq!(device_index("/dev/csmi0,1"), None);
+    }
+
+    #[test]
+    fn reads_self_test_progress() {
+        let ata: Value = serde_json::json!({"ata_smart_data": {"self_test": {"status": {"value": 249, "string": "in progress, 90% remaining", "remaining_percent": 90}}}});
+        let st = parse_self_test_status(&ata);
+        assert!(st.running);
+        assert_eq!(st.remaining_percent, Some(90));
+        let done: Value = serde_json::json!({"ata_smart_data": {"self_test": {"status": {"value": 0, "string": "completed without error", "passed": true}}}});
+        assert!(!parse_self_test_status(&done).running);
+        let nvme: Value = serde_json::json!({"nvme_self_test_log": {"current_self_test_operation": {"value": 1, "string": "Short self-test in progress"}, "current_self_test_completion_percent": 30}});
+        let st = parse_self_test_status(&nvme);
+        assert!(st.running);
+        assert_eq!(st.remaining_percent, Some(70));
     }
 
     #[test]

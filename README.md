@@ -10,9 +10,23 @@ S.M.A.R.T. data, on one screen. Built with Tauri 2 (Rust core, React + TypeScrip
   (Hi-Speed `HSnn` = USB 2.0, SuperSpeed `SSnn` = USB 3).
 - `src-tauri/src/smartctl.rs` runs the bundled `smartctl.exe` (smartmontools) with `--json`,
   read-only and with a timeout, and parses the result.
-- `src-tauri/src/health.rs` turns the raw data into a score, a status and findings.
+- `src-tauri/src/health.rs` turns the raw data into a score, a status and findings, including
+  "worse since the last check".
+- `src-tauri/src/history.rs` keeps each drive's history (by serial number) in the app's data
+  folder (`%APPDATA%\com.smartcheck.app\history`): a line per check when something changed or
+  every 6 hours, the last full report (so unplugged drives still show), and speed test results.
+- Self-tests (short/extended) run inside the drive via smartctl, after re-confirming the serial.
+- `src-tauri/src/bench.rs` + `speedtest.rs` measure speed with unbuffered I/O (the same method as
+  DiskSpd and CrystalDiskMark), on a 1 GB test file that is written with real data first and
+  always deleted. Safety checks before starting (right drive, 3 GB free, no problem sectors, no
+  self-test running) and a watchdog that stops at the first storage reset or disk error Windows
+  logs (UASPStor/storport event 129, disk events 7/11/153).
 - `src/` is the UI. Opened in a browser instead of the app, it shows preview data from
-  `src/mock/scan.json`.
+  `src/mock/` (real readings from 25 Nov 2026; self-tests are simulated).
+
+Checked against Microsoft DiskSpd on a hard drive, sequential results match within ±1.5%.
+DiskSpd itself is not bundled: its downloadable program is licensed for use on your own device
+only, not for redistribution.
 
 Reading S.M.A.R.T. data needs administrator rights: release builds ask once at launch; debug builds
 run as the current user and offer "Restart as administrator".
@@ -26,8 +40,15 @@ npm run tauri dev      # the desktop app (needs Rust + MSVC build tools)
 cd src-tauri && cargo test
 ```
 
-Browser preview only: `?drive=<serial>&details=findings|score|attributes|tests|drive` opens a
-specific state.
+Browser preview only: `?drive=<serial>&details=findings|score|attributes|tests|history|drive`,
+`&speed=open|run` and `&selftest=short|long` open a specific state.
+
+Diagnostics (run from `src-tauri`):
+
+```
+cargo run --example scan_dump                       # full scan as JSON, nothing saved (run as admin)
+cargo run --release --example bench_compare -- <folder> [prepare|<test id>]   # speed tests only
+```
 
 Regenerate the preview data from the real engine and the test fixtures:
 

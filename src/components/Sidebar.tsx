@@ -1,6 +1,6 @@
 import type { DriveReport, ScanResult } from "../types";
 import { brand, logo } from "../brand";
-import { STATUS, driveSubtitle, isExternal } from "../format";
+import { STATUS, driveSubtitle, fmtDayTime, isExternal } from "../format";
 import { DriveIcon, RefreshIcon, StatusIcon } from "./Icons";
 import { openLink } from "../api";
 
@@ -32,6 +32,7 @@ export function Sidebar({ scan, selectedKey, scanning, onSelect, onRescan }: Pro
       <nav className="drive-list" aria-label="Drives">
         {external.length > 0 && <Group label="External" drives={external} selectedKey={selectedKey} onSelect={onSelect} />}
         {internal.length > 0 && <Group label="Internal" drives={internal} selectedKey={selectedKey} onSelect={onSelect} />}
+        {(scan?.offline.length ?? 0) > 0 && <Group label="Previously checked" drives={scan!.offline} selectedKey={selectedKey} onSelect={onSelect} />}
         {scan && drives.length === 0 && <p className="side-empty">No drives found.</p>}
       </nav>
 
@@ -70,14 +71,14 @@ function Group({ label, drives, selectedKey, onSelect }: { label: string; drives
         return (
           <button
             key={d.key}
-            className={`drive-item${d.key === selectedKey ? " sel" : ""}`}
+            className={`drive-item${d.key === selectedKey ? " sel" : ""}${d.connected ? "" : " offline"}`}
             onClick={() => onSelect(d.key)}
             aria-current={d.key === selectedKey ? "true" : undefined}
           >
             <DriveIcon kind={d.kind} />
             <span className="di-text">
               <b>{d.title}</b>
-              <span>{driveSubtitle(d)}</span>
+              <span>{d.connected ? driveSubtitle(d) : `${d.smart?.serial ? `…${d.smart.serial.slice(-4)} · ` : ""}${fmtDayTime(d.checkedAtMs)}`}</span>
             </span>
             {d.health && st ? (
               <span className="di-score" title={st.label}>

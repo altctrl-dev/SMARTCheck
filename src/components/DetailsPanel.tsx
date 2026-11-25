@@ -1,15 +1,17 @@
-import { useEffect, useRef } from "react";
-import type { DriveReport } from "../types";
-import { STATUS, fmtBytes, fmtHours, fmtNum } from "../format";
+import { useEffect, useRef, useState } from "react";
+import type { DriveHistory, DriveReport } from "../types";
+import { STATUS, fmtBytes, fmtDateTime, fmtHours, fmtNum } from "../format";
+import { getHistory } from "../api";
 import { CloseIcon, StatusIcon } from "./Icons";
 
-export type DetailsTab = "findings" | "score" | "attributes" | "tests" | "drive";
+export type DetailsTab = "findings" | "score" | "attributes" | "tests" | "history" | "drive";
 
 const TABS: { id: DetailsTab; label: string }[] = [
   { id: "findings", label: "Findings" },
   { id: "score", label: "Score" },
   { id: "attributes", label: "Attributes" },
   { id: "tests", label: "Self-tests & errors" },
+  { id: "history", label: "History" },
   { id: "drive", label: "Drive" },
 ];
 
@@ -53,6 +55,7 @@ export function DetailsPanel({ drive, tab, onTab, onClose }: Props) {
           {tab === "score" && <Score drive={drive} />}
           {tab === "attributes" && <Attributes drive={drive} />}
           {tab === "tests" && <Tests drive={drive} />}
+          {tab === "history" && <History drive={drive} />}
           {tab === "drive" && <DriveInfo drive={drive} />}
         </div>
       </aside>
@@ -242,6 +245,113 @@ function Tests({ drive }: { drive: DriveReport }) {
                 <td>{errorText(e.description)}</td>
                 <td className="num">{e.lba != null ? fmtNum(e.lba) : "—"}</td>
                 <td className="num">{e.lifetimeHours ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
+function History({ drive }: { drive: DriveReport }) {
+  const [hist, setHist] = useState<DriveHistory | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    getHistory(drive.key).then(setHist).catch((e) => setError(String(e)));
+  }, [drive.key]);
+  if (error) return <p className="muted-text">{error}</p>;
+  if (!hist) return <p className="muted-text">Loading…</p>;
+  const nvme = !!drive.smart?.nvme;
+  const snaps = [...hist.snapshots].reverse();
+  const runs = [...hist.speedRuns].reverse();
+  const mb = (r: { results: { id: string; mbPerS: number }[] }, id: string) => {
+    const m = r.results.find((x) => x.id === id);
+    return m ? m.mbPerS.toFixed(m.mbPerS >= 100 ? 0 : 1) : "—";
+  };
+  return (
+    <>
+      <p className="muted-text">
+        SMARTCheck saves a check whenever something changes, and at least every 6 hours while the drive is in use. Counters that keep growing are the
+        clearest sign a drive is wearing out.
+      </p>
+      <h3>Health checks</h3>
+      {snaps.length === 0 ? (
+        <p className="muted-text">No saved checks yet.</p>
+      ) : (
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Checked</th>
+              <th>Health</th>
+              {nvme ? (
+                <>
+                  <th className="num">Life used</th>
+                  <th className="num">Media errors</th>
+                </>
+              ) : (
+                <>
+                  <th className="num">Pending</th>
+                  <th className="num">Replaced</th>
+                  <th className="num">Errors</th>
+                </>
+              )}
+              <th className="num">Temp</th>
+              <th className="num">Hours</th>
+            </tr>
+          </thead>
+          <tbody>
+            {snaps.map((s) => (
+              <tr key={s.atMs}>
+                <td>{fmtDateTime(s.atMs)}</td>
+                <td>
+                  <span className="status-inline">
+                    <StatusIcon level={STATUS[s.status].level} size={14} />
+                    {s.score}% {STATUS[s.status].label}
+                  </span>
+                </td>
+                {nvme ? (
+                  <>
+                    <td className="num">{s.percentageUsed ?? "—"}%</td>
+                    <td className="num">{fmtNum(s.mediaErrors)}</td>
+                  </>
+                ) : (
+                  <>
+                    <td className="num">{fmtNum(s.pending)}</td>
+                    <td className="num">{fmtNum(s.reallocated)}</td>
+                    <td className="num">{fmtNum(s.errorLog)}</td>
+                  </>
+                )}
+                <td className="num">{s.temperature != null ? `${s.temperature} °C` : "—"}</td>
+                <td className="num">{s.powerOnHours != null ? fmtNum(s.powerOnHours) : "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <h3>Speed tests</h3>
+      {runs.length === 0 ? (
+        <p className="muted-text">No speed tests yet.</p>
+      ) : (
+        <table className="tbl">
+          <thead>
+            <tr>
+              <th>Tested</th>
+              <th className="num">Seq. read</th>
+              <th className="num">Seq. write</th>
+              <th>Connection</th>
+            </tr>
+          </thead>
+          <tbody>
+            {runs.map((r) => (
+              <tr key={r.atMs}>
+                <td>
+                  {fmtDateTime(r.atMs)}
+                  {r.stopped && <div className="sub">Stopped early</div>}
+                </td>
+                <td className="num">{mb(r, "seq1m_q8_read")} MB/s</td>
+                <td className="num">{mb(r, "seq1m_q8_write")} MB/s</td>
+                <td>{r.link === "usb3" ? "USB 3" : r.link === "usb2" ? "USB 2.0" : "Internal"} · {r.volume}:</td>
               </tr>
             ))}
           </tbody>

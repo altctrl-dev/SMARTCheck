@@ -3,6 +3,7 @@
 
 #[tokio::main]
 async fn main() {
-    let result = smartcheck_lib::scan::scan_all(std::env::current_dir().ok()).await;
+    // No history store: a diagnostic scan doesn't save anything.
+    let result = smartcheck_lib::scan::scan_all(std::env::current_dir().ok(), None).await;
     println!("{}", serde_json::to_string_pretty(&result).expect("serialize scan result"));
 }
