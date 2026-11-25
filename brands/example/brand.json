@@ -1,0 +1,16 @@
+{
+  "companyName": "Acme IT Services",
+  "appName": "SMARTCheck",
+  "accent": {
+    "light": "#0f766e",
+    "lightInk": "#ffffff",
+    "dark": "#2bb3a3",
+    "darkInk": "#0b0b0b"
+  },
+  "support": {
+    "phone": "+1 555 0100",
+    "email": "support@acme.example",
+    "website": "acme.example/help"
+  },
+  "reportFooter": "Checked by Acme IT Services. Questions? Call +1 555 0100."
+}

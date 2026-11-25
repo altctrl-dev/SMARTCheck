@@ -1,0 +1,8 @@
+﻿smartctl.exe is part of smartmontools, which is free software licensed under the
+GNU General Public License version 2 (see COPYING.txt in this folder).
+
+Bundled version: smartctl 7.5 2025-04-30 r5714 [x86_64-w64-mingw32-w11-b26300] (AppVeyor)
+
+SMARTCheck runs smartctl.exe as a separate, unmodified program.
+Source code for smartmontools: https://www.smartmontools.org/  (releases and source archives)
+Source repository: https://github.com/smartmontools/smartmontools

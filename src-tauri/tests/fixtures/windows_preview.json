@@ -1,0 +1,90 @@
+[
+  {
+    "number": 0,
+    "friendlyName": "KBG50ZNS512G NVMe KIOXIA 512GB",
+    "busType": "NVMe",
+    "mediaType": "SSD",
+    "sizeBytes": 512110190592,
+    "isSystem": true,
+    "isBoot": true,
+    "volumes": [
+      {
+        "letter": "C",
+        "label": "",
+        "fileSystem": "NTFS",
+        "sizeBytes": 510913789952,
+        "freeBytes": 269084573696
+      }
+    ],
+    "usb": null
+  },
+  {
+    "number": 1,
+    "friendlyName": "WDC WD10 SPZX-75Z10T3",
+    "busType": "USB",
+    "mediaType": "HDD",
+    "sizeBytes": 1000204886016,
+    "isSystem": false,
+    "isBoot": false,
+    "volumes": [
+      {
+        "letter": "D",
+        "label": "",
+        "fileSystem": "exFAT",
+        "sizeBytes": 1000186314752,
+        "freeBytes": 991139086336
+      }
+    ],
+    "usb": {
+      "instanceId": "USB\\VID_0BDA&PID_9201\\MSFT30012345679457",
+      "locationPaths": "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(13)|ACPI(_SB_)#ACPI(PC00)#ACPI(XHCI)#ACPI(RHUB)#ACPI(SS01)",
+      "service": "UASPStor"
+    }
+  },
+  {
+    "number": 2,
+    "friendlyName": "cablet USB 3.0",
+    "busType": "USB",
+    "mediaType": "Unspecified",
+    "sizeBytes": 1000204886016,
+    "isSystem": false,
+    "isBoot": false,
+    "volumes": [
+      {
+        "letter": "E",
+        "label": "New Volume",
+        "fileSystem": "exFAT",
+        "sizeBytes": 1000186314752,
+        "freeBytes": 991139086336
+      }
+    ],
+    "usb": {
+      "instanceId": "USB\\VID_152D&PID_0578\\MSFT30FF202406110168",
+      "locationPaths": "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(13)|ACPI(_SB_)#ACPI(PC00)#ACPI(XHCI)#ACPI(RHUB)#ACPI(SS01)",
+      "service": "UASPStor"
+    }
+  },
+  {
+    "number": 3,
+    "friendlyName": "cablet USB 3.0",
+    "busType": "USB",
+    "mediaType": "Unspecified",
+    "sizeBytes": 1000204886016,
+    "isSystem": false,
+    "isBoot": false,
+    "volumes": [
+      {
+        "letter": "F",
+        "label": "",
+        "fileSystem": "exFAT",
+        "sizeBytes": 1000186314752,
+        "freeBytes": 1000164229120
+      }
+    ],
+    "usb": {
+      "instanceId": "USB\\VID_152D&PID_0578\\MSFT30FF202406110168",
+      "locationPaths": "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(1)|ACPI(_SB_)#ACPI(PC00)#ACPI(XHCI)#ACPI(RHUB)#ACPI(HS01)",
+      "service": "UASPStor"
+    }
+  }
+]
