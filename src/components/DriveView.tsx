@@ -77,7 +77,10 @@ export function DriveView({ drive, scan, scanning, onRescan, onDetails }: Props)
               <section className="card chart-card">
                 <div className="card-h">
                   <h2>Temperature</h2>
-                  <span className="sub">last {Math.round((s.tempHistory.values.length * s.tempHistory.intervalMinutes) / 60)} hours powered on · °C</span>
+                  <span className="sub">
+                    last {Math.round((s.tempHistory.values.length * s.tempHistory.intervalMinutes) / 60)} hours powered on
+                    {s.tempHistory.intervalMinutes > 1 ? ` · every ${s.tempHistory.intervalMinutes} min` : ""} · °C
+                  </span>
                 </div>
                 <TempChart history={s.tempHistory} endMs={scan.scannedAtMs} />
               </section>

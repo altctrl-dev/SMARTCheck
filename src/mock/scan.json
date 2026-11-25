@@ -2,11 +2,10 @@
   "scannedAtMs": 1795592100000,
   "elevated": true,
   "smartctlVersion": "7.5",
-  "warnings": [],
   "drives": [
     {
       "diskNumber": 0,
-      "key": "disk0",
+      "key": "TESTNVME0001",
       "title": "KBG50ZNS512G NVMe KIOXIA 512GB",
       "capacityLabel": "512 GB",
       "kind": "nvme",
@@ -29,9 +28,160 @@
         ],
         "usb": null
       },
-      "smart": null,
-      "smartError": "Preview data doesn’t include this drive. Run SMARTCheck as administrator to read it.",
-      "health": null
+      "smart": {
+        "protocol": "NVMe",
+        "deviceType": "nvme",
+        "deviceName": "/dev/sdx",
+        "modelFamily": null,
+        "modelName": "KBG50ZNS512G NVMe KIOXIA 512GB",
+        "serial": "TESTNVME0001",
+        "firmware": "11200109",
+        "capacityBytes": 512110190592,
+        "rotationRate": null,
+        "formFactor": null,
+        "sataVersion": null,
+        "linkSpeed": null,
+        "linkSpeedMax": null,
+        "trim": null,
+        "smr": false,
+        "smartPassed": true,
+        "powerOnHours": 7694,
+        "powerCycles": 772,
+        "temperature": 59,
+        "tempLifetimeMin": null,
+        "tempLifetimeMax": null,
+        "tempLimit": 83,
+        "tempHistory": null,
+        "attributes": [],
+        "errorLogCount": 0,
+        "errorLog": [],
+        "selfTests": [
+          {
+            "kind": "Short",
+            "status": "Aborted: Controller Reset",
+            "passed": null,
+            "lifetimeHours": 21,
+            "lbaFirstError": null
+          }
+        ],
+        "selfTestRemaining": null,
+        "selfTestMinutesShort": null,
+        "selfTestMinutesExtended": null,
+        "nvme": {
+          "criticalWarning": 0,
+          "availableSpare": 100,
+          "availableSpareThreshold": 50,
+          "percentageUsed": 5,
+          "mediaErrors": 0,
+          "errorLogEntries": 4,
+          "unsafeShutdowns": 55
+        },
+        "bytesWritten": 14612121088000,
+        "bytesRead": 20815554560000,
+        "messages": []
+      },
+      "smartError": null,
+      "health": {
+        "score": 95,
+        "status": "excellent",
+        "summary": "No signs of wear or failure.",
+        "findings": [
+          {
+            "level": "good",
+            "title": "No signs of wear or failure",
+            "detail": "5% of its rated write life is used, there are no media errors and the drive reports no warnings.",
+            "action": null
+          }
+        ],
+        "indicators": [
+          {
+            "label": "S.M.A.R.T. verdict",
+            "value": "PASSED",
+            "level": "good",
+            "help": "The drive’s own overall health check."
+          },
+          {
+            "label": "Life used",
+            "value": "5%",
+            "level": "good",
+            "help": "Share of the drive’s rated write endurance already used."
+          },
+          {
+            "label": "Available spare",
+            "value": "100% (min 50%)",
+            "level": "good",
+            "help": "Reserve blocks left for replacing worn cells."
+          },
+          {
+            "label": "Media errors",
+            "value": "0",
+            "level": "good",
+            "help": "Data the drive couldn’t read back correctly."
+          },
+          {
+            "label": "Critical warnings",
+            "value": "None",
+            "level": "good",
+            "help": "Warning flags raised by the drive itself."
+          },
+          {
+            "label": "Error log entries",
+            "value": "4",
+            "level": "info",
+            "help": "Command errors logged by the controller. Often harmless."
+          },
+          {
+            "label": "Unsafe shutdowns",
+            "value": "55",
+            "level": "info",
+            "help": "Times power was lost without a clean shutdown."
+          },
+          {
+            "label": "Self-tests",
+            "value": "1 aborted",
+            "level": "info",
+            "help": "Built-in diagnostics run by the drive. Aborted tests count as neither passed nor failed."
+          }
+        ],
+        "deductions": [
+          {
+            "factor": "Wear (life used)",
+            "rule": "−1 per % used",
+            "value": "5%",
+            "points": 5
+          },
+          {
+            "factor": "Media and data integrity errors",
+            "rule": "−5 each, up to −40",
+            "value": "0",
+            "points": 0
+          },
+          {
+            "factor": "Spare blocks below threshold",
+            "rule": "−40",
+            "value": "No",
+            "points": 0
+          },
+          {
+            "factor": "Critical warning from the drive",
+            "rule": "−30",
+            "value": "None",
+            "points": 0
+          },
+          {
+            "factor": "Most recent self-test failed",
+            "rule": "−30",
+            "value": "No",
+            "points": 0
+          },
+          {
+            "factor": "Temperature above 83 °C",
+            "rule": "−10",
+            "value": "59 °C",
+            "points": 0
+          }
+        ]
+      }
     },
     {
       "diskNumber": 1,
@@ -582,7 +732,7 @@
             "label": "Self-tests",
             "value": "3 of 3 passed",
             "level": "good",
-            "help": "Built-in diagnostics run by the drive."
+            "help": "Built-in diagnostics run by the drive. Aborted tests count as neither passed nor failed."
           }
         ],
         "deductions": [
@@ -1192,7 +1342,7 @@
             "label": "Self-tests",
             "value": "2 of 2 passed",
             "level": "good",
-            "help": "Built-in diagnostics run by the drive."
+            "help": "Built-in diagnostics run by the drive. Aborted tests count as neither passed nor failed."
           }
         ],
         "deductions": [
@@ -1789,7 +1939,7 @@
             "label": "Self-tests",
             "value": "2 of 2 passed",
             "level": "good",
-            "help": "Built-in diagnostics run by the drive."
+            "help": "Built-in diagnostics run by the drive. Aborted tests count as neither passed nor failed."
           }
         ],
         "deductions": [
@@ -1843,6 +1993,608 @@
           }
         ]
       }
+    },
+    {
+      "diskNumber": 4,
+      "key": "TESTSEAGATE1",
+      "title": "Seagate Mobile HDD 1 TB",
+      "capacityLabel": "1 TB",
+      "kind": "hdd",
+      "windows": {
+        "number": 4,
+        "friendlyName": "cablet USB 3.0",
+        "busType": "USB",
+        "mediaType": null,
+        "sizeBytes": 1000204886016,
+        "isSystem": false,
+        "isBoot": false,
+        "volumes": [
+          {
+            "letter": "G",
+            "label": "",
+            "fileSystem": "NTFS",
+            "sizeBytes": 999191826432,
+            "freeBytes": 990006542336
+          }
+        ],
+        "usb": {
+          "vendorId": "152D",
+          "productId": "0578",
+          "chip": "JMicron",
+          "link": "usb3",
+          "port": "SS01",
+          "driver": "UAS"
+        }
+      },
+      "smart": {
+        "protocol": "ATA",
+        "deviceType": "sat",
+        "deviceName": "/dev/sdx",
+        "modelFamily": "Seagate Mobile HDD",
+        "modelName": "ST1000LM035-1RK172",
+        "serial": "TESTSEAGATE1",
+        "firmware": "1002",
+        "capacityBytes": 1000204886016,
+        "rotationRate": 5400,
+        "formFactor": "2.5 inches",
+        "sataVersion": "SATA 3.1",
+        "linkSpeed": "6.0 Gb/s",
+        "linkSpeedMax": "6.0 Gb/s",
+        "trim": true,
+        "smr": false,
+        "smartPassed": true,
+        "powerOnHours": 39,
+        "powerCycles": 28,
+        "temperature": 31,
+        "tempLifetimeMin": 24,
+        "tempLifetimeMax": 40,
+        "tempLimit": 55,
+        "tempHistory": {
+          "intervalMinutes": 30,
+          "values": [
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            35,
+            null,
+            25,
+            null,
+            25,
+            null,
+            25,
+            null,
+            27,
+            null,
+            27,
+            null,
+            27,
+            null,
+            28,
+            null,
+            28,
+            null,
+            24,
+            null,
+            30,
+            null,
+            29,
+            null,
+            30,
+            38,
+            37,
+            null,
+            34,
+            36,
+            36,
+            37,
+            35,
+            null,
+            33,
+            null,
+            32,
+            38,
+            38,
+            39,
+            37,
+            38,
+            37,
+            null,
+            33,
+            null,
+            33,
+            36,
+            null,
+            33,
+            39,
+            39,
+            39,
+            37,
+            37,
+            null,
+            30,
+            null,
+            29,
+            null,
+            30,
+            40,
+            null,
+            31,
+            null,
+            30,
+            37,
+            null,
+            29,
+            37,
+            null,
+            29,
+            38,
+            37,
+            38,
+            38,
+            38,
+            37,
+            35,
+            null,
+            29,
+            null,
+            28,
+            null,
+            31,
+            31
+          ]
+        },
+        "attributes": [
+          {
+            "id": 1,
+            "name": "Raw_Read_Error_Rate",
+            "value": 83,
+            "worst": 64,
+            "thresh": 6,
+            "raw": 199979647,
+            "rawString": "199979647",
+            "prefail": true,
+            "whenFailed": ""
+          },
+          {
+            "id": 3,
+            "name": "Spin_Up_Time",
+            "value": 99,
+            "worst": 99,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": true,
+            "whenFailed": ""
+          },
+          {
+            "id": 4,
+            "name": "Start_Stop_Count",
+            "value": 100,
+            "worst": 100,
+            "thresh": 20,
+            "raw": 36,
+            "rawString": "36",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 5,
+            "name": "Reallocated_Sector_Ct",
+            "value": 100,
+            "worst": 100,
+            "thresh": 36,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": true,
+            "whenFailed": ""
+          },
+          {
+            "id": 7,
+            "name": "Seek_Error_Rate",
+            "value": 65,
+            "worst": 60,
+            "thresh": 45,
+            "raw": 3121047,
+            "rawString": "3121047",
+            "prefail": true,
+            "whenFailed": ""
+          },
+          {
+            "id": 9,
+            "name": "Power_On_Hours",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 67516885893159,
+            "rawString": "39 (61 104 0)",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 10,
+            "name": "Spin_Retry_Count",
+            "value": 100,
+            "worst": 100,
+            "thresh": 97,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": true,
+            "whenFailed": ""
+          },
+          {
+            "id": 12,
+            "name": "Power_Cycle_Count",
+            "value": 100,
+            "worst": 100,
+            "thresh": 20,
+            "raw": 28,
+            "rawString": "28",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 184,
+            "name": "End-to-End_Error",
+            "value": 100,
+            "worst": 100,
+            "thresh": 99,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 187,
+            "name": "Reported_Uncorrect",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 188,
+            "name": "Command_Timeout",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 189,
+            "name": "High_Fly_Writes",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 190,
+            "name": "Airflow_Temperature_Cel",
+            "value": 69,
+            "worst": 60,
+            "thresh": 40,
+            "raw": 555679775,
+            "rawString": "31 (Min/Max 31/33)",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 191,
+            "name": "G-Sense_Error_Rate",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 192,
+            "name": "Power-Off_Retract_Count",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 5,
+            "rawString": "5",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 193,
+            "name": "Load_Cycle_Count",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 269,
+            "rawString": "269",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 194,
+            "name": "Temperature_Celsius",
+            "value": 31,
+            "worst": 40,
+            "thresh": 0,
+            "raw": 103079215135,
+            "rawString": "31 (0 24 0 0 0)",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 197,
+            "name": "Current_Pending_Sector",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 198,
+            "name": "Offline_Uncorrectable",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 199,
+            "name": "UDMA_CRC_Error_Count",
+            "value": 200,
+            "worst": 200,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 240,
+            "name": "Head_Flying_Hours",
+            "value": 100,
+            "worst": 253,
+            "thresh": 0,
+            "raw": 43233140801553,
+            "rawString": "17 (39 82 0)",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 241,
+            "name": "Total_LBAs_Written",
+            "value": 100,
+            "worst": 253,
+            "thresh": 0,
+            "raw": 556926379,
+            "rawString": "556926379",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 242,
+            "name": "Total_LBAs_Read",
+            "value": 100,
+            "worst": 253,
+            "thresh": 0,
+            "raw": 375475527,
+            "rawString": "375475527",
+            "prefail": false,
+            "whenFailed": ""
+          },
+          {
+            "id": 254,
+            "name": "Free_Fall_Sensor",
+            "value": 100,
+            "worst": 100,
+            "thresh": 0,
+            "raw": 0,
+            "rawString": "0",
+            "prefail": false,
+            "whenFailed": ""
+          }
+        ],
+        "errorLogCount": 0,
+        "errorLog": [],
+        "selfTests": [
+          {
+            "kind": "Short offline",
+            "status": "Completed without error",
+            "passed": true,
+            "lifetimeHours": 0,
+            "lbaFirstError": null
+          },
+          {
+            "kind": "Short offline",
+            "status": "Completed without error",
+            "passed": true,
+            "lifetimeHours": 0,
+            "lbaFirstError": null
+          }
+        ],
+        "selfTestRemaining": null,
+        "selfTestMinutesShort": 1,
+        "selfTestMinutesExtended": 163,
+        "nvme": null,
+        "bytesWritten": 285146306048,
+        "bytesRead": 192243469824,
+        "messages": []
+      },
+      "smartError": null,
+      "health": {
+        "score": 100,
+        "status": "excellent",
+        "summary": "No signs of wear or failure.",
+        "findings": [
+          {
+            "level": "good",
+            "title": "No signs of wear or failure",
+            "detail": "Every critical counter is at zero and the drive has logged no errors. Its self-tests passed.",
+            "action": null
+          },
+          {
+            "level": "info",
+            "title": "5 sudden power losses",
+            "detail": "Each time the drive loses power while running, its heads park in an emergency. Unplugging without “Safely remove” is the usual cause, and it can leave weak sectors behind.",
+            "action": "Use “Safely remove” before unplugging."
+          }
+        ],
+        "indicators": [
+          {
+            "label": "S.M.A.R.T. verdict",
+            "value": "PASSED",
+            "level": "good",
+            "help": "The drive’s own overall pass/fail check."
+          },
+          {
+            "label": "Reallocated sectors",
+            "value": "0",
+            "level": "good",
+            "help": "Damaged spots already replaced with spares. The most important wear sign."
+          },
+          {
+            "label": "Pending sectors",
+            "value": "0",
+            "level": "good",
+            "help": "Sectors that read unreliably and are waiting to be re-tested."
+          },
+          {
+            "label": "Uncorrectable sectors",
+            "value": "0",
+            "level": "good",
+            "help": "Sectors the drive couldn’t read during its own scan."
+          },
+          {
+            "label": "Drive error log",
+            "value": "0",
+            "level": "good",
+            "help": "Read/write commands that failed."
+          },
+          {
+            "label": "Spin retries",
+            "value": "0",
+            "level": "good",
+            "help": "Times the motor needed a second try to reach full speed."
+          },
+          {
+            "label": "Interface CRC errors",
+            "value": "0",
+            "level": "good",
+            "help": "Data damaged between drive and computer. Usually the cable or adapter."
+          },
+          {
+            "label": "Self-tests",
+            "value": "2 of 2 passed",
+            "level": "good",
+            "help": "Built-in diagnostics run by the drive. Aborted tests count as neither passed nor failed."
+          }
+        ],
+        "deductions": [
+          {
+            "factor": "Reallocated (replaced) sectors",
+            "rule": "−1 per sector, up to −40",
+            "value": "0",
+            "points": 0
+          },
+          {
+            "factor": "Current pending sectors",
+            "rule": "−2 per sector, up to −40",
+            "value": "0",
+            "points": 0
+          },
+          {
+            "factor": "Offline uncorrectable sectors",
+            "rule": "−2 per sector, up to −40",
+            "value": "0",
+            "points": 0
+          },
+          {
+            "factor": "Spin retries",
+            "rule": "−5 each, up to −20",
+            "value": "0",
+            "points": 0
+          },
+          {
+            "factor": "Errors in the drive’s error log",
+            "rule": "−2 each, up to −20",
+            "value": "0",
+            "points": 0
+          },
+          {
+            "factor": "Most recent self-test failed",
+            "rule": "−30",
+            "value": "No",
+            "points": 0
+          },
+          {
+            "factor": "Temperature above 55 °C",
+            "rule": "−10",
+            "value": "31 °C",
+            "points": 0
+          },
+          {
+            "factor": "Attributes past failure threshold",
+            "rule": "−60 if any",
+            "value": "0",
+            "points": 0
+          }
+        ]
+      }
     }
-  ]
+  ],
+  "warnings": []
 }

@@ -65,6 +65,31 @@ fn test_failed(t: &SelfTest) -> bool {
     t.passed == Some(false) && !st.contains("abort") && !st.contains("interrupt")
 }
 
+/// "2 of 2 passed", "1 of 2 passed · 1 aborted", "1 aborted" (none completed).
+fn self_test_indicator(tests: &[SelfTest]) -> Indicator {
+    let passed = tests.iter().filter(|t| t.passed == Some(true)).count();
+    let failed = tests.iter().filter(|t| test_failed(t)).count();
+    let other = tests.len() - passed - failed;
+    let last_failed = tests.first().is_some_and(test_failed);
+    let completed = passed + failed;
+    let value = match (tests.is_empty(), completed, other) {
+        (true, _, _) => "None run".to_string(),
+        (false, 0, o) => format!("{o} aborted"),
+        (false, c, 0) => format!("{passed} of {c} passed"),
+        (false, c, o) => format!("{passed} of {c} passed · {o} aborted"),
+    };
+    let level = if last_failed {
+        Level::Critical
+    } else if failed > 0 {
+        Level::Warning
+    } else if completed == 0 {
+        Level::Info
+    } else {
+        Level::Good
+    };
+    indicator("Self-tests", value, level, "Built-in diagnostics run by the drive. Aborted tests count as neither passed nor failed.")
+}
+
 fn temp_limit(s: &SmartInfo, kind: DriveKind) -> i64 {
     s.temp_limit.unwrap_or(if kind == DriveKind::Hdd { 60 } else { 70 })
 }
@@ -175,7 +200,6 @@ fn assess_ata(s: &SmartInfo, kind: DriveKind, usb: Option<&UsbInfo>) -> Health {
     let crc = raw(199);
     let failing: Vec<&AtaAttribute> = s.attributes.iter().filter(|a| a.thresh > 0 && a.value <= a.thresh).collect();
     let last_failed = s.self_tests.first().is_some_and(test_failed);
-    let tests_failed = s.self_tests.iter().filter(|t| test_failed(t)).count();
     let limit = temp_limit(s, kind);
     let life_left = if kind == DriveKind::Ssd { ssd_life_left(s) } else { None };
     let passed = s.smart_passed != Some(false);
@@ -361,13 +385,7 @@ fn assess_ata(s: &SmartInfo, kind: DriveKind, usb: Option<&UsbInfo>) -> Health {
         push_attr(&mut ind, s, 10, "Spin retries", 1, 5, "Times the motor needed a second try to reach full speed.");
     }
     push_attr(&mut ind, s, 199, "Interface CRC errors", 1, 50, "Data damaged between drive and computer. Usually the cable or adapter.");
-    let tests_total = s.self_tests.len();
-    ind.push(indicator(
-        "Self-tests",
-        if tests_total == 0 { "None run".to_string() } else { format!("{} of {} passed", tests_total - tests_failed, tests_total) },
-        if last_failed { Level::Critical } else if tests_failed > 0 { Level::Warning } else if tests_total == 0 { Level::Info } else { Level::Good },
-        "Built-in diagnostics run by the drive.",
-    ));
+    ind.push(self_test_indicator(&s.self_tests));
 
     Health { score, status, summary, findings, indicators: ind, deductions: d }
 }
@@ -468,13 +486,7 @@ fn assess_nvme(s: &SmartInfo, usb: Option<&UsbInfo>) -> Health {
         ind.push(indicator("Unsafe shutdowns", fmt_num(us), Level::Info, "Times power was lost without a clean shutdown."));
     }
     if !s.self_tests.is_empty() {
-        let failed = s.self_tests.iter().filter(|t| test_failed(t)).count();
-        ind.push(indicator(
-            "Self-tests",
-            format!("{} of {} passed", s.self_tests.len() - failed, s.self_tests.len()),
-            if last_failed { Level::Critical } else if failed > 0 { Level::Warning } else { Level::Good },
-            "Built-in diagnostics run by the drive.",
-        ));
+        ind.push(self_test_indicator(&s.self_tests));
     }
 
     Health { score, status, summary, findings, indicators: ind, deductions: d }

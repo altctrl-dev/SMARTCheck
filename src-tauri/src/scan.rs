@@ -203,6 +203,47 @@ mod tests {
         assert_eq!(h.summary, "Connected at USB 2.0 speed. Everything else looks normal.");
     }
 
+    fn real(file: &str, dtype: &str, win: &Value) -> DriveReport {
+        let smart = smartctl::parse(&load(file), "/dev/sdx", dtype);
+        let raw: RawWinDisk = serde_json::from_value(win.clone()).unwrap();
+        build_report(windows_info::to_win_disk(raw), Some(smart), None)
+    }
+
+    /// Real smartctl 7.5 output from a KIOXIA NVMe SSD (serial replaced).
+    #[test]
+    fn real_nvme_reads_wear_limit_and_aborted_self_test() {
+        let r = real("real_kioxia_nvme.json", "nvme", &preview_windows()[0]);
+        assert_eq!(r.kind, DriveKind::Nvme);
+        let h = r.health.as_ref().unwrap();
+        assert_eq!(h.score, 95, "5% of rated life used");
+        assert_eq!(h.status, HealthStatus::Excellent);
+        let tests = h.indicators.iter().find(|i| i.label == "Self-tests").unwrap();
+        assert_eq!(tests.value, "1 aborted");
+        assert_eq!(tests.level, Level::Info);
+        let s = r.smart.as_ref().unwrap();
+        assert_eq!(s.temp_limit, Some(83));
+        assert_eq!(s.bytes_written, Some(28_539_299 * 512_000));
+        assert!(s.temp_history.is_none());
+    }
+
+    /// Real smartctl 7.5 output from a Seagate ST1000LM035 behind a JMicron USB adapter (serial replaced).
+    #[test]
+    fn real_seagate_skips_vendor_specific_error_rates() {
+        let r = real("real_seagate_st1000lm035.json", "sat", &preview_windows()[2]);
+        assert_eq!(r.title, "Seagate Mobile HDD 1 TB");
+        assert_eq!(r.kind, DriveKind::Hdd);
+        let h = r.health.as_ref().unwrap();
+        assert_eq!(h.score, 100);
+        assert_eq!(h.status, HealthStatus::Excellent);
+        // Seagate packs other data into these raw values; showing them would raise false alarms.
+        assert!(!h.indicators.iter().any(|i| i.label == "Read error rate" || i.label == "Seek error rate"));
+        let s = r.smart.as_ref().unwrap();
+        assert_eq!(s.temp_limit, Some(55));
+        let hist = s.temp_history.as_ref().unwrap();
+        assert_eq!(hist.interval_minutes, 30);
+        assert_eq!(hist.values.len(), 128);
+    }
+
     /// `UPDATE_MOCK=1 cargo test write_preview_data` regenerates the browser preview data
     /// (src/mock/scan.json) from the fixtures, so the preview always matches the real engine.
     #[test]
@@ -211,15 +252,13 @@ mod tests {
             return;
         }
         let w = preview_windows();
-        let nvme: RawWinDisk = serde_json::from_value(w[0].clone()).unwrap();
-        let mut drives = vec![build_report(
-            windows_info::to_win_disk(nvme),
-            None,
-            Some("Preview data doesn’t include this drive. Run SMARTCheck as administrator to read it.".into()),
-        )];
-        drives.push(report("wd_WXG2A511Z64P.json", &w[1]));
-        drives.push(report("wd_WXD2A5156PC4.json", &w[2]));
-        drives.push(report("wd_WXE2A41CJUV4.json", &w[3]));
+        let drives = vec![
+            real("real_kioxia_nvme.json", "nvme", &w[0]),
+            report("wd_WXG2A511Z64P.json", &w[1]),
+            report("wd_WXD2A5156PC4.json", &w[2]),
+            report("wd_WXE2A41CJUV4.json", &w[3]),
+            real("real_seagate_st1000lm035.json", "sat", &w[4]),
+        ];
         let result = ScanResult {
             scanned_at_ms: 1_795_592_100_000, // 25 Nov 2026 13:05 IST
 

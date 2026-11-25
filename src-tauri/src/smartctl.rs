@@ -216,11 +216,17 @@ pub fn parse(v: &Value, device_name: &str, device_type: &str) -> SmartInfo {
             self_tests = arr
                 .iter()
                 .map(|e| {
-                    let code = u(e, "/self_test_result/value");
+                    // NVMe result codes: 0 = completed without error; 5, 6, 7 = failed;
+                    // the rest are aborted/interrupted, which is neither a pass nor a fail.
+                    let passed = match u(e, "/self_test_result/value") {
+                        Some(0) => Some(true),
+                        Some(5..=7) => Some(false),
+                        _ => None,
+                    };
                     SelfTest {
                         kind: s(e, "/self_test_code/string").unwrap_or_else(|| "Self-test".into()),
                         status: s(e, "/self_test_result/string").unwrap_or_default(),
-                        passed: code.map(|c| c == 0),
+                        passed,
                         lifetime_hours: u(e, "/power_on_hours"),
                         lba_first_error: u(e, "/lba"),
                     }

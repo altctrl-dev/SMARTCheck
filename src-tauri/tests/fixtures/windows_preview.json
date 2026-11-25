@@ -86,5 +86,28 @@
       "locationPaths": "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(1)|ACPI(_SB_)#ACPI(PC00)#ACPI(XHCI)#ACPI(RHUB)#ACPI(HS01)",
       "service": "UASPStor"
     }
+  },
+  {
+    "number": 4,
+    "friendlyName": "cablet USB 3.0",
+    "busType": "USB",
+    "mediaType": "Unspecified",
+    "sizeBytes": 1000204886016,
+    "isSystem": false,
+    "isBoot": false,
+    "volumes": [
+      {
+        "letter": "G",
+        "label": "",
+        "fileSystem": "NTFS",
+        "sizeBytes": 999191826432,
+        "freeBytes": 990006542336
+      }
+    ],
+    "usb": {
+      "instanceId": "USB\\VID_152D&PID_0578\\MSFT30FF202406110168",
+      "locationPaths": "PCIROOT(0)#PCI(1400)#USBROOT(0)#USB(13)|ACPI(_SB_)#ACPI(PC00)#ACPI(XHCI)#ACPI(RHUB)#ACPI(SS01)",
+      "service": "UASPStor"
+    }
   }
 ]

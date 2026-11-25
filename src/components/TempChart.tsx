@@ -1,6 +1,6 @@
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import type { TempHistory } from "../types";
-import { fmtTime } from "../format";
+import { fmtDay, fmtDayTime, fmtTime } from "../format";
 
 interface Props {
   history: TempHistory;
@@ -54,12 +54,29 @@ export function TempChart({ history, endMs }: Props) {
   const last = valid[valid.length - 1];
   const isolated = valid.filter((i) => i !== last && vals[i - 1] == null && vals[i + 1] == null);
 
-  // Time ticks on round half-hours (hours on narrow charts).
-  const tickEvery = (iw < 320 ? 60 : 30) * 60_000;
-  const ticks: number[] = [];
+  // Time ticks: the smallest round step (in local time) that leaves room for each label.
+  // Drives log every 1 to 30+ minutes, so the span ranges from ~2 hours to several days.
+  const spanMs = Math.max(1, (n - 1) * stepMs);
+  const multiDay = spanMs > 20 * 3_600_000;
+  const DAY = 86_400_000;
+  // Approximate label widths: "24 Nov" (daily ticks), "24 Nov, 18:00", "18:00".
+  const labelWidth = (step: number) => (step >= DAY ? 64 : multiDay ? 120 : 80);
+  const STEPS = [30, 60, 120, 180, 360, 720, 1440, 2880].map((m) => m * 60_000);
+  const tickEvery = STEPS.find((st) => spanMs / st <= Math.max(2, Math.floor(iw / labelWidth(st)))) ?? STEPS[STEPS.length - 1];
+  const tzOffset = -new Date(endMs).getTimezoneOffset() * 60_000;
+  const bucket = (ms: number) => Math.floor((ms + tzOffset) / tickEvery);
+  // Each tick sits exactly on a round local time (e.g. midnight), between the two readings around it.
+  const ticks: { x: number; ms: number }[] = [];
   for (let i = 1; i < n; i++) {
-    if (Math.floor(timeAt(i) / tickEvery) !== Math.floor(timeAt(i - 1) / tickEvery)) ticks.push(i);
+    const b = bucket(timeAt(i));
+    if (b !== bucket(timeAt(i - 1))) {
+      const ms = b * tickEvery - tzOffset;
+      const frac = (ms - timeAt(i - 1)) / stepMs;
+      ticks.push({ x: x(i - 1) + frac * (x(i) - x(i - 1)), ms });
+    }
   }
+  const label = (ms: number) => (multiDay ? fmtDayTime(ms) : fmtTime(ms));
+  const tickLabel = (ms: number) => (tickEvery >= DAY ? fmtDay(ms) : label(ms));
   const yTicks: number[] = [];
   for (let v = lo; v <= hi; v += 5) yTicks.push(v);
 
@@ -107,9 +124,9 @@ export function TempChart({ history, endMs }: Props) {
               </text>
             </g>
           ))}
-          {ticks.map((i) => (
-            <text key={i} x={x(i)} y={size.h - 5} textAnchor="middle" className="tick">
-              {fmtTime(timeAt(i))}
+          {ticks.map((t) => (
+            <text key={t.ms} x={t.x} y={size.h - 5} textAnchor="middle" className="tick">
+              {tickLabel(t.ms)}
             </text>
           ))}
           <path d={d} className="series-line" />
@@ -130,7 +147,7 @@ export function TempChart({ history, endMs }: Props) {
       )}
       {hover != null && (
         <div className="tip" style={{ left: Math.max(0, tipLeft), top: Math.max(0, hy - 46) }}>
-          <div className="t">{fmtTime(timeAt(hover))} (approx.)</div>
+          <div className="t">{label(timeAt(hover))} (approx.)</div>
           <div className="v">{vals[hover]} °C</div>
         </div>
       )}

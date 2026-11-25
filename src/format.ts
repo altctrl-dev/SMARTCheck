@@ -26,6 +26,13 @@ export function fmtHours(h: number | null | undefined): string {
 export const fmtTime = (ms: number) =>
   new Date(ms).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
 
+/** "26 Nov", for daily chart ticks. */
+export const fmtDay = (ms: number) => new Date(ms).toLocaleDateString(undefined, { day: "numeric", month: "short" });
+
+/** "26 Nov, 18:00" style, for chart axes spanning more than a day. */
+export const fmtDayTime = (ms: number) =>
+  new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+
 export const fmtDateTime = (ms: number) =>
   new Date(ms).toLocaleString(undefined, { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
 
