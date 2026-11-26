@@ -90,19 +90,45 @@ never change.
 
 ### Code signing
 
-Unsigned installers trigger a SmartScreen warning, and PCs with Smart App Control on block them.
-`build:brand` signs when one of these is set:
+SMARTCheck is signed with a self-signed certificate: free, and fine for an internal tool, because
+it's trusted only on PCs where it has been installed. Once per build PC:
+
+```
+powershell -ExecutionPolicy Bypass -File scripts\signing\new-cert.ps1 -Publisher "Your Company"
+```
+
+That makes a code-signing certificate (5 years, RSA 3072) in Current User > Personal; the
+publisher name is what Windows shows as "Verified publisher" (default "SMARTCheck (internal)").
+To change it later, run it again with `-Force` and the new name, then rebuild; PCs that trusted
+the old certificate need the new one installed. It can only sign programs, not act as a
+certificate authority or secure websites.
+`build:brand` finds it and signs the app, the setup.exe and the MSI, timestamped so they stay valid
+after it expires. It also puts `SMARTCheck-signing.cer` (the public part) and
+`Install certificate.cmd` next to the installers.
+
+**On each technician PC, once:** run `Install certificate.cmd` (it asks for administrator rights).
+It adds the certificate to Trusted Root and Trusted Publishers, so the admin prompt shows the
+publisher name as verified and any tampering with the files shows up.
+The undo commands are at the top of the file.
+
+Limits: Windows SmartScreen can still warn about files downloaded from the internet (copy them by
+USB stick or network share instead), and PCs with Smart App Control on block programs that aren't
+signed by a publicly trusted certificate. To sign with a commercial certificate or Azure Trusted
+Signing instead, set one of these before `build:brand`:
 
 ```
 set SMARTCHECK_SIGN_THUMBPRINT=<certificate thumbprint>    # certificate in the Windows store
-set SMARTCHECK_TIMESTAMP_URL=http://timestamp.digicert.com # optional
-set SMARTCHECK_SIGN_COMMAND=<command with %1>              # or e.g. an Azure Trusted Signing command
+set SMARTCHECK_SIGN_COMMAND=<command with %1>              # or a full signing command
+set SMARTCHECK_TIMESTAMP_URL=http://timestamp.digicert.com # optional; "none" skips timestamping
 ```
 
-Signing settings are removed from `tauri.conf.json` after every build.
+The private key never leaves the certificate store. Back it up (or move signing to another PC)
+with certmgr.msc > Personal > Certificates > "SMARTCheck code signing" > All Tasks > Export, with the
+private key and a password. Signing settings are removed from `tauri.conf.json` after every build.
 
 ## Licences
 
 `src-tauri/resources/smartmontools/` contains the unmodified `smartctl.exe` from smartmontools
 (GPL-2.0), its licence (`COPYING.txt`) and where to get its source (`SOURCE.txt`). SMARTCheck runs
-it as a separate program.
+it as a separate program. Signed builds add SMARTCheck's code signature to the installed copy; the
+program itself is unchanged.
