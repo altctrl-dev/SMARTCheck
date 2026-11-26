@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { isDesktop } from "../api";
 import type { DriveReport, Health, Level, ScanResult, SmartInfo } from "../types";
-import { STATUS, fmtBytes, fmtDateTime, fmtHours, fmtNum, fmtTime, tempLevel } from "../format";
+import { STATUS, fmtBytes, fmtDateTime, fmtHours, fmtNum, fmtTime, tempHistoryHours, tempLevel, usedTempHistory } from "../format";
 import { DetailsIcon, RefreshIcon, StatusIcon } from "./Icons";
 import { TempChart } from "./TempChart";
 import type { DetailsTab } from "./DetailsPanel";
 import { SelfTestMenu, SelfTestStrip, useSelfTest } from "./SelfTest";
 import { SpeedTestPanel, speedTestBlocker } from "./SpeedTestPanel";
+import { ExportPanel } from "./ExportPanel";
 
 interface Props {
   drive: DriveReport;
@@ -23,6 +24,7 @@ export function DriveView({ drive, scan, scanning, onRescan, onDetails }: Props)
   // Browser preview only: ?speed=open|run and ?selftest=short|long open those states for screenshots.
   const preview = isDesktop ? null : new URLSearchParams(window.location.search);
   const [speedOpen, setSpeedOpen] = useState(preview?.get("speed") != null);
+  const [exportOpen, setExportOpen] = useState(preview?.get("export") != null);
   const previewSelfTest = preview?.get("selftest");
   useEffect(() => {
     if (previewSelfTest === "short" || previewSelfTest === "long") selfTest.start(previewSelfTest);
@@ -73,8 +75,12 @@ export function DriveView({ drive, scan, scanning, onRescan, onDetails }: Props)
             <DetailsIcon />
             Details
           </button>
+          <button className="btn primary" onClick={() => setExportOpen(true)}>
+            Export report
+          </button>
         </div>
       </header>
+      {exportOpen && <ExportPanel drive={drive} smartctlVersion={scan.smartctlVersion} onClose={() => setExportOpen(false)} />}
 
       {!drive.connected && (
         <div className="banner info">
@@ -125,11 +131,11 @@ export function DriveView({ drive, scan, scanning, onRescan, onDetails }: Props)
                 <div className="card-h">
                   <h2>Temperature</h2>
                   <span className="sub">
-                    last {Math.round((s.tempHistory.values.length * s.tempHistory.intervalMinutes) / 60)} hours powered on
+                    last {tempHistoryHours(usedTempHistory(s.tempHistory))} hours powered on
                     {s.tempHistory.intervalMinutes > 1 ? ` · every ${s.tempHistory.intervalMinutes} min` : ""} · °C
                   </span>
                 </div>
-                <TempChart history={s.tempHistory} endMs={drive.checkedAtMs || scan.scannedAtMs} />
+                <TempChart history={usedTempHistory(s.tempHistory)} endMs={drive.checkedAtMs || scan.scannedAtMs} />
               </section>
             ) : (
               <UsageCard s={s} />

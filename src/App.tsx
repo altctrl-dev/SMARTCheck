@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { ScanResult } from "./types";
-import { isDesktop, restartAsAdmin, scanDrives } from "./api";
+import { getHistory, isDesktop, restartAsAdmin, scanDrives } from "./api";
+import { makeReportHtml } from "./components/ExportPanel";
 import { fmtDateTime, fmtTime, isExternal } from "./format";
 import { Sidebar } from "./components/Sidebar";
 import { DriveView } from "./components/DriveView";
@@ -41,6 +42,20 @@ export default function App() {
 
   const drive = [...(scan?.drives ?? []), ...(scan?.offline ?? [])].find((d) => d.key === selectedKey) ?? null;
   const closeDetails = useCallback(() => setDetails(null), []);
+
+  // Browser preview only: ?drive=<serial>&report=show renders the exported report itself.
+  useEffect(() => {
+    if (!scan || !drive || previewParams?.get("report") !== "show") return;
+    getHistory(drive.key)
+      .then((history) =>
+        makeReportHtml(drive, history, { preparedBy: "A. Technician", customer: "Ticket 1042 · front desk PC", notes: "", includeSpeed: true, includeHistory: true }, scan.smartctlVersion),
+      )
+      .then((html) => {
+        document.open();
+        document.write(html);
+        document.close();
+      });
+  }, [scan, drive]);
 
   return (
     <div className="app">

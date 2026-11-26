@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 dist
+# Branded installers made by `npm run build:brand`
+/installers
 dist-ssr
 *.local
 

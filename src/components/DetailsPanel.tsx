@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { DriveHistory, DriveReport } from "../types";
-import { STATUS, fmtBytes, fmtDateTime, fmtHours, fmtNum } from "../format";
+import { STATUS, errorText, fmtBytes, fmtDateTime, fmtHours, fmtNum } from "../format";
 import { getHistory } from "../api";
 import { CloseIcon, StatusIcon } from "./Icons";
 
@@ -359,24 +359,6 @@ function History({ drive }: { drive: DriveReport }) {
       )}
     </>
   );
-}
-
-const ATA_ERRORS: Record<string, string> = {
-  UNC: "Unreadable data (uncorrectable)",
-  ABRT: "Command aborted",
-  IDNF: "Sector not found",
-  ICRC: "Transfer error (CRC)",
-  AMNF: "Address mark not found",
-  TK0NF: "Track 0 not found",
-  MC: "Media changed",
-  WP: "Write protected",
-};
-
-/** "Error: UNC at LBA = 0x0001040c = 66572" -> "Unreadable data (uncorrectable)" */
-function errorText(description: string): string {
-  const codes = description.replace(/^Error:\s*/, "").replace(/\s+at LBA.*$/, "").split(/[\s,]+/).filter(Boolean);
-  const words = codes.map((c) => ATA_ERRORS[c] ?? c);
-  return words.join(", ") || description;
 }
 
 function DriveInfo({ drive }: { drive: DriveReport }) {

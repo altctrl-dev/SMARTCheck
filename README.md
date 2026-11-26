@@ -61,20 +61,45 @@ set UPDATE_MOCK=1 && cargo test write_preview_data
 (including Rust build scripts and the app itself) are blocked unless signed by a trusted publisher.
 Build on a machine without it, or build and sign in CI.
 
+## Reports
+
+**Export report** saves a branded A4 report as PDF or HTML: health, findings and next steps,
+indicators, temperature, self-tests, the latest speed test and history, with optional "Prepared
+by", "Customer / asset" and notes. PDFs are made by Microsoft Edge's built-in print-to-PDF
+(headless, with a throwaway profile). **Copy summary** puts a plain-text summary on the clipboard
+for tickets. The report is built in `src/report.ts`; `?drive=<serial>&report=show` renders it in
+the browser preview.
+
 ## Branding (one installer per organization)
 
 Each organization has a folder in `brands/` with `brand.json` (company name, app name, accent
-colours, support contact, report footer) and `logo.svg`, plus an optional `icon.png` (1024 px).
+colours, support contact, report footer) and `logo.svg`, plus an optional `icon.png` (1024 px;
+otherwise the app icon is rendered from the logo).
 
 ```
-npm run brand -- example         # switch the build to brands/example
-npx tauri icon brands/example/icon.png   # if the brand has its own app icon
-npm run tauri build              # installer named after the organization
-npm run brand -- default         # back to plain SMARTCheck
+npm run build:brand -- example   # installers for brands/example, in installers/example/
 ```
+
+That applies the brand, makes the icons, builds the MSI and setup.exe (named after the
+organization, with its own identifier so several can be installed side by side) and switches
+back to the default brand. `npm run brand -- <name>` only switches the brand, e.g. for
+`npm run tauri dev`.
 
 The brand colour applies to buttons, links and highlights. Health colours (green, amber, red)
 never change.
+
+### Code signing
+
+Unsigned installers trigger a SmartScreen warning, and PCs with Smart App Control on block them.
+`build:brand` signs when one of these is set:
+
+```
+set SMARTCHECK_SIGN_THUMBPRINT=<certificate thumbprint>    # certificate in the Windows store
+set SMARTCHECK_TIMESTAMP_URL=http://timestamp.digicert.com # optional
+set SMARTCHECK_SIGN_COMMAND=<command with %1>              # or e.g. an Azure Trusted Signing command
+```
+
+Signing settings are removed from `tauri.conf.json` after every build.
 
 ## Licences
 

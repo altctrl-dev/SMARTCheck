@@ -1,5 +1,6 @@
 pub mod bench;
 pub mod elevation;
+pub mod export;
 pub mod health;
 pub mod history;
 pub mod model;
@@ -72,6 +73,17 @@ fn cancel_speed_test() {
     speedtest::cancel();
 }
 
+/// Saves a report built by the UI to `path`, as "html" or "pdf".
+#[tauri::command]
+async fn export_report(html: String, path: String, format: String) -> Result<(), String> {
+    export::save_report(&html, std::path::Path::new(&path), &format).await
+}
+
+#[tauri::command]
+fn show_in_folder(path: String) -> Result<(), String> {
+    export::show_in_folder(std::path::Path::new(&path))
+}
+
 /// Starts an elevated copy of the app (Windows asks for permission), then closes this one.
 #[tauri::command]
 fn restart_as_admin(app: tauri::AppHandle) -> Result<(), String> {
@@ -84,8 +96,11 @@ fn restart_as_admin(app: tauri::AppHandle) -> Result<(), String> {
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             scan_drives,
+            export_report,
+            show_in_folder,
             get_history,
             start_self_test,
             self_test_status,

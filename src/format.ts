@@ -1,6 +1,16 @@
-import type { DriveReport, HealthStatus, Level } from "./types";
+import type { DriveReport, HealthStatus, Level, TempHistory } from "./types";
 
 export const fmtNum = (n: number) => n.toLocaleString("en-US");
+
+/** The temperature log without the slots the drive hasn't written yet (a drive's log starts
+ *  empty and fills during its first powered-on hours), so charts cover only real readings. */
+export function usedTempHistory(h: TempHistory): TempHistory {
+  const first = h.values.findIndex((v) => v != null);
+  return first > 0 ? { ...h, values: h.values.slice(first) } : h;
+}
+
+/** How many powered-on hours a (used) temperature log spans. */
+export const tempHistoryHours = (h: TempHistory) => Math.max(1, Math.round((h.values.length * h.intervalMinutes) / 60));
 
 /** Decimal units, matching how drive makers label capacity. */
 export function fmtBytes(bytes: number | null | undefined): string {
@@ -64,6 +74,23 @@ export function driveSubtitle(d: DriveReport): string {
     link = `Internal ${bus}`.trim();
   }
   return l ? `${l} · ${link}` : link;
+}
+
+const ATA_ERRORS: Record<string, string> = {
+  UNC: "Unreadable data (uncorrectable)",
+  ABRT: "Command aborted",
+  IDNF: "Sector not found",
+  ICRC: "Transfer error (CRC)",
+  AMNF: "Address mark not found",
+  TK0NF: "Track 0 not found",
+  MC: "Media changed",
+  WP: "Write protected",
+};
+
+/** "Error: UNC at LBA = 0x0001040c = 66572" -> "Unreadable data (uncorrectable)" */
+export function errorText(description: string): string {
+  const codes = description.replace(/^Error:\s*/, "").replace(/\s+at LBA.*$/, "").split(/[\s,]+/).filter(Boolean);
+  return codes.map((c) => ATA_ERRORS[c] ?? c).join(", ") || description;
 }
 
 export function tempLevel(t: number | null | undefined, limit: number): Level {
